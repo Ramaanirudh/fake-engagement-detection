@@ -320,47 +320,47 @@ if page == "📊 Overview":
         col4.metric("Recall (Bot)",    f"{recall:.2%}")
         col5.metric("F1-Score (Bot)",  f"{f1:.2%}")
 
-    st.markdown("---")
+    # ── Confusion matrix + Feature importance (only if data available) ─────────
+    if metrics or fi_df is not None:
+        st.markdown("---")
+        col_left, col_right = st.columns(2)
 
-    col_left, col_right = st.columns(2)
+        with col_left:
+            if metrics:
+                st.pyplot(confusion_matrix_fig(metrics["confusion_matrix"]))
+                st.caption(
+                    f"True Negatives: **{tn}** | False Positives: **{fp}** | "
+                    f"False Negatives: **{fn}** | True Positives: **{tp}**"
+                )
 
-    # ── Confusion matrix ─────────────────────────────────────────────────────
-    with col_left:
-        if metrics:
-            st.pyplot(confusion_matrix_fig(metrics["confusion_matrix"]))
-            st.caption(
-                f"True Negatives: **{tn}** | False Positives: **{fp}** | "
-                f"False Negatives: **{fn}** | True Positives: **{tp}**"
-            )
-
-    # ── Feature importance ───────────────────────────────────────────────────
-    with col_right:
-        if fi_df is not None:
-            fig, ax = plt.subplots(figsize=(6, 4))
-            fig.patch.set_facecolor("#1E2130")
-            ax.set_facecolor("#1E2130")
-            labels_short = [FEATURE_LABELS[f] for f in fi_df["feature"]][::-1]
-            ax.barh(
-                labels_short,
-                fi_df["importance"].values[::-1],
-                color="#7B9FE0",
-                height=0.6,
-                edgecolor="#2E3250",
-            )
-            ax.set_xlabel("Mean |SHAP Value|", color="#8B9DC3", fontsize=9)
-            ax.tick_params(colors="#8B9DC3", labelsize=8)
-            for spine in ax.spines.values():
-                spine.set_edgecolor("#2E3250")
-            plt.tight_layout()
-            st.pyplot(fig)
-
-    st.markdown("---")
+        with col_right:
+            if fi_df is not None:
+                fig, ax = plt.subplots(figsize=(6, 4))
+                fig.patch.set_facecolor("#1E2130")
+                ax.set_facecolor("#1E2130")
+                labels_short = [FEATURE_LABELS[f] for f in fi_df["feature"]][::-1]
+                ax.barh(
+                    labels_short,
+                    fi_df["importance"].values[::-1],
+                    color="#7B9FE0",
+                    height=0.6,
+                    edgecolor="#2E3250",
+                )
+                ax.set_xlabel("Mean |SHAP Value|", color="#8B9DC3", fontsize=9)
+                ax.tick_params(colors="#8B9DC3", labelsize=8)
+                for spine in ax.spines.values():
+                    spine.set_edgecolor("#2E3250")
+                plt.tight_layout()
+                st.pyplot(fig)
 
     # ── SHAP summary image ───────────────────────────────────────────────────
+    st.markdown("---")
     st.subheader("SHAP Beeswarm Summary")
     _shap_ov = _find_file("shap_summary.png")
     if _shap_ov:
-        st.image(str(_shap_ov), use_column_width=True)
+        _, img_col, _ = st.columns([0.5, 3, 0.5])
+        with img_col:
+            st.image(str(_shap_ov), use_column_width=True)
         st.caption(
             "Each point represents one test sample. Colour indicates feature value "
             "(red = high, blue = low). Position on the x-axis shows the impact on the "
