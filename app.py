@@ -361,6 +361,11 @@ if page == "📊 Overview":
         _, img_col, _ = st.columns([0.5, 3, 0.5])
         with img_col:
             st.image(str(_shap_ov), use_column_width=True)
+        st.caption(
+            "Each point represents one test sample. Colour indicates feature value "
+            "(red = high, blue = low). Position on the x-axis shows the impact on the "
+            "model's bot-classification output."
+        )
         with st.expander("How to read this plot"):
             st.markdown(
                 """
@@ -615,9 +620,24 @@ elif page == "📈 Model Insights":
             "a model-agnostic measure of each feature's average contribution to predictions."
         )
         if fi_df is not None:
+            # Bar chart
+            fig_fi, ax_fi = plt.subplots(figsize=(7, 4))
+            fig_fi.patch.set_facecolor("#1E2130")
+            ax_fi.set_facecolor("#1E2130")
+            labels_fi = [FEATURE_LABELS[f] for f in fi_df["feature"]][::-1]
+            ax_fi.barh(labels_fi, fi_df["importance"].values[::-1],
+                       color="#7B9FE0", height=0.6, edgecolor="#2E3250")
+            ax_fi.set_xlabel("Mean |SHAP Value|", color="#8B9DC3", fontsize=9)
+            ax_fi.tick_params(colors="#8B9DC3", labelsize=8)
+            for spine in ax_fi.spines.values():
+                spine.set_edgecolor("#2E3250")
+            plt.tight_layout()
+            st.pyplot(fig_fi)
+
+            # Ranked table
             fi_display = fi_df.copy()
-            fi_display["Rank"]    = range(1, len(fi_df) + 1)
-            fi_display["Feature"] = fi_df["feature"].map(FEATURE_LABELS)
+            fi_display["Rank"]        = range(1, len(fi_df) + 1)
+            fi_display["Feature"]     = fi_df["feature"].map(FEATURE_LABELS)
             fi_display["Mean |SHAP|"] = fi_df["importance"].round(4)
             fi_display["Relative %"]  = (fi_df["importance"] / fi_df["importance"].sum() * 100).round(1)
             st.dataframe(
@@ -625,15 +645,39 @@ elif page == "📈 Model Insights":
                 use_container_width=True,
                 hide_index=True,
             )
-            st.markdown(
-                """
-                **Key Findings:**
-                - `Behavioral Volatility Index` is the strongest predictor. Low volatility is a hallmark of scripted bot activity.
-                - `Comment Similarity Score` captures the tendency of bots to post repetitive, templated comments.
-                - `Follower/Following Ratio` is the third most important feature, despite showing weak correlation with others — confirming it captures independent, complementary information.
-                - `Interaction Density Score` is the weakest contributor, likely due to its high correlation with features already captured by the model.
-                """
-            )
+
+            # Per-feature insight cards
+            st.markdown("---")
+            st.markdown("#### 🔎 What Each Feature Tells the Model")
+            insights = [
+                ("🥇", "Behavioral Volatility Index", "0.1740", "35.0%",
+                 "The single strongest signal. **Bots behave predictably** — their activity is scripted and repetitive, resulting in very low variance. "
+                 "A low volatility score strongly pushes the model toward a Bot prediction. "
+                 "Human users, by contrast, have irregular, spontaneous behaviour that produces high volatility."),
+                ("🥈", "Comment Similarity Score", "0.1378", "27.7%",
+                 "The second most important feature. **Bots reuse templated comments** — copy-pasted promotional text or near-identical replies — "
+                 "leading to high semantic similarity across their comment history. "
+                 "Organic users write varied, context-specific comments that keep this score low."),
+                ("🥉", "Follower / Following Ratio", "0.0986", "19.8%",
+                 "Notably, this feature showed **weak correlation** with all others in the correlation analysis, yet ranks 3rd here. "
+                 "This confirms it captures an **independent dimension** of bot behaviour: bots aggressively follow many accounts to gain followers back, "
+                 "inflating their following count disproportionately."),
+                ("4️⃣", "Posting Frequency", "0.0491", "9.9%",
+                 "Bots post far more frequently than organic users to maximise reach. "
+                 "A high posting rate combined with high comment similarity is a reliable compound signal of automated activity."),
+                ("5️⃣", "Timing Regularity Score", "0.0315", "6.3%",
+                 "Automated accounts post at highly regular intervals — like a scheduled task. "
+                 "While useful, this feature overlaps with behavioral volatility, which is why its individual SHAP contribution is smaller."),
+                ("6️⃣", "Engagement Burst Ratio", "0.0273", "5.5%",
+                 "Coordinated bot networks produce sudden, simultaneous engagement spikes on specific posts. "
+                 "This feature captures those bursts, though it is partially redundant with timing regularity."),
+                ("7️⃣", "Interaction Density Score", "0.0166", "3.3%",
+                 "The weakest predictor individually. Its information is largely **already captured** by posting frequency and comment similarity, "
+                 "as confirmed by their high inter-correlations (r > 0.6) observed in the correlation analysis."),
+            ]
+            for rank, feat, shap_val, pct, desc in insights:
+                with st.expander(f"{rank}  **{feat}** — Mean |SHAP| `{shap_val}` · Relative contribution `{pct}`"):
+                    st.markdown(desc)
 
     # ── Tab 2 — SHAP beeswarm ─────────────────────────────────────────────────
     with tab2:
@@ -644,20 +688,55 @@ elif page == "📈 Model Insights":
         )
         _shap_path2 = _find_file("shap_summary.png")
         if _shap_path2:
-            st.image(str(_shap_path2), use_column_width=True)
-            with st.expander("How to read this plot"):
+            _, img_col2, _ = st.columns([0.5, 3, 0.5])
+            with img_col2:
+                st.image(str(_shap_path2), use_column_width=True)
+            with st.expander("📖 How to read this plot"):
                 st.markdown(
                     """
-                    | Element | Meaning |
-                    |---------|---------|
-                    | **X-axis position** | Impact on the bot-classification output (positive = pushes toward Bot) |
-                    | **Point colour (red)** | High feature value for that sample |
-                    | **Point colour (blue)** | Low feature value for that sample |
-                    | **Vertical spread** | Multiple samples with similar SHAP values |
-                    
-                    **Example interpretation:** For `behavioral_volatility_index`, blue points (low volatility) appear on the right (positive SHAP = pushes toward Bot). This confirms that accounts with low behavioural variability are more likely to be classified as bots.
+| Element | Meaning |
+|---|---|
+| **X-axis position** | Impact on the bot-classification output (positive = pushes toward Bot) |
+| **Point colour (red)** | High feature value for that sample |
+| **Point colour (blue)** | Low feature value for that sample |
+| **Vertical spread** | Multiple samples with similar SHAP values |
                     """
                 )
+            st.markdown("---")
+            st.markdown("#### 🔎 Feature-by-Feature SHAP Interpretation")
+            beeswarm_insights = [
+                ("behavioral_volatility_index",
+                 "🔵 Blue dots (low volatility) appear far to the **right** — strongly pushing toward Bot. "
+                 "🔴 Red dots (high volatility) appear to the **left** — pushing toward Organic. "
+                 "**Conclusion:** Low behavioural regularity is the clearest bot signature the model found."),
+                ("comment_similarity_score",
+                 "🔴 Red dots (high similarity) cluster to the **right** — pushing toward Bot. "
+                 "Bots post near-identical comments repeatedly, which the model detects reliably. "
+                 "**Conclusion:** Templated, repetitive commenting is a strong automated activity marker."),
+                ("follower_following_ratio",
+                 "🔴 Red dots (high ratio) are spread far to the **right** — a strong bot signal. "
+                 "Bots follow aggressively to gain followers back, creating an inflated ratio. "
+                 "**Conclusion:** An unusually high follower/following ratio is a reliable independent bot indicator."),
+                ("posting_frequency",
+                 "🔴 Red dots (high frequency) lean to the **right** — pushing toward Bot. "
+                 "Automated accounts post continuously to maximise reach. "
+                 "**Conclusion:** Abnormally high posting rates correlate with bot behaviour."),
+                ("timing_regularity_score",
+                 "Points cluster tightly near zero with slight rightward lean for higher values. "
+                 "**Conclusion:** Some regularity signal exists but is largely absorbed by the volatility index — "
+                 "it provides redundant information."),
+                ("engagement_burst_ratio",
+                 "Most points hug zero, with a few outlier red dots to the right. "
+                 "**Conclusion:** Burst engagement is an occasional but not consistent bot signal — "
+                 "it fires for coordinated bot networks but not all bot types."),
+                ("interaction_density_score",
+                 "Very tight clustering near zero for almost all samples. "
+                 "**Conclusion:** This feature contributes almost no unique information — "
+                 "its signal is entirely captured by posting frequency and comment similarity."),
+            ]
+            for feat, insight in beeswarm_insights:
+                with st.expander(f"**{FEATURE_LABELS[feat]}**"):
+                    st.markdown(insight)
         else:
             st.info("Upload `shap_summary.png` to your repository.")
 
@@ -695,6 +774,37 @@ elif page == "📈 Model Insights":
                 spine.set_edgecolor("#2E3250")
             plt.tight_layout()
             st.pyplot(fig)
+
+            # Per-feature distribution insight
+            dist_insights = {
+                "timing_regularity_score":
+                    "**What the distribution reveals:** Bot accounts (red) are shifted toward higher values "
+                    "with a tighter spread, confirming they post at more predictable intervals. "
+                    "Organic users (green) show a broader, lower-centred distribution reflecting natural variation.",
+                "engagement_burst_ratio":
+                    "**What the distribution reveals:** Both classes overlap heavily at lower values, "
+                    "but bots have a longer right tail — occasional extreme burst events that organic users rarely produce.",
+                "comment_similarity_score":
+                    "**What the distribution reveals:** The two distributions are clearly separated. "
+                    "Bots cluster at higher similarity scores (templated comments), while organic users "
+                    "spread across lower values (varied, unique comments).",
+                "interaction_density_score":
+                    "**What the distribution reveals:** The distributions largely overlap, which is consistent "
+                    "with this feature being the weakest SHAP contributor — it does not cleanly separate bots from organic users.",
+                "follower_following_ratio":
+                    "**What the distribution reveals:** Organic users (green) concentrate near a ratio of 1 "
+                    "(balanced following/followers). Bots (red) extend further right with higher ratios, "
+                    "reflecting their aggressive following strategy.",
+                "posting_frequency":
+                    "**What the distribution reveals:** Organic users post infrequently (left-clustered). "
+                    "Bots show a wider spread at higher frequencies, consistent with automated, high-volume posting.",
+                "behavioral_volatility_index":
+                    "**What the distribution reveals:** This is the cleanest separation of all seven features. "
+                    "Bots cluster at very low volatility values (scripted, predictable). "
+                    "Organic users spread across higher values (irregular, human behaviour). "
+                    "This directly explains why it is the #1 SHAP feature.",
+            }
+            st.info(dist_insights.get(feat_sel, ""))
 
             with st.expander("Preview raw data"):
                 st.dataframe(df_data.head(50), use_container_width=True)
