@@ -28,7 +28,7 @@ warnings.filterwarnings("ignore")
 
 # ── Resolve all paths relative to this file's location ───────────────────────
 BASE_DIR    = Path(__file__).resolve().parent
-MODELS_DIR  = BASE_DIR / "models"
+MODELS_DIR  = BASE_DIR          # .pkl files are in the repo root, not models/
 OUTPUTS_DIR = BASE_DIR / "outputs"
 
 # ── Page config ───────────────────────────────────────────────────────────────
