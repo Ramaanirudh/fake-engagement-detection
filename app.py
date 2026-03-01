@@ -9,6 +9,7 @@ import json
 import os
 import pickle
 import warnings
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -24,6 +25,11 @@ from sklearn.metrics import (
 )
 
 warnings.filterwarnings("ignore")
+
+# ── Resolve all paths relative to this file's location ───────────────────────
+BASE_DIR    = Path(__file__).resolve().parent
+MODELS_DIR  = BASE_DIR / "models"
+OUTPUTS_DIR = BASE_DIR / "outputs"
 
 # ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -134,12 +140,11 @@ FEATURE_HELP = {
 @st.cache_resource(show_spinner="Loading models…")
 def load_models():
     """Load all serialised model artefacts from the models/ directory."""
-    base = "models"
     try:
-        rf       = pickle.load(open(f"/rf_model.pk",       "rb"))
-        iso      = pickle.load(open(f"/iso_forest.pkl",     "rb"))
-        scaler   = pickle.load(open(f"/scaler.pkl",         "rb"))
-        explainer = pickle.load(open(f"/shap_explainer.pkl","rb"))
+        rf        = pickle.load(open(MODELS_DIR / "rf_model.pkl",       "rb"))
+        iso       = pickle.load(open(MODELS_DIR / "iso_forest.pkl",     "rb"))
+        scaler    = pickle.load(open(MODELS_DIR / "scaler.pkl",         "rb"))
+        explainer = pickle.load(open(MODELS_DIR / "shap_explainer.pkl", "rb"))
         return rf, iso, scaler, explainer
     except FileNotFoundError as e:
         st.error(
@@ -152,7 +157,7 @@ def load_models():
 @st.cache_data
 def load_metrics():
     try:
-        with open("outputs/metrics.json") as f:
+        with open(OUTPUTS_DIR / "metrics.json") as f:
             return json.load(f)
     except FileNotFoundError:
         return None
@@ -161,7 +166,7 @@ def load_metrics():
 @st.cache_data
 def load_feature_importance():
     try:
-        return pd.read_csv("outputs/feature_importance.csv")
+        return pd.read_csv(OUTPUTS_DIR / "feature_importance.csv")
     except FileNotFoundError:
         return None
 
@@ -351,8 +356,8 @@ if page == "📊 Overview":
 
     # ── SHAP summary image ───────────────────────────────────────────────────
     st.subheader("SHAP Beeswarm Summary")
-    if os.path.exists("outputs/shap_summary.png"):
-        st.image("outputs/shap_summary.png", use_column_width=True)
+    if os.path.exists(OUTPUTS_DIR / "shap_summary.png"):
+        st.image(str(OUTPUTS_DIR / "shap_summary.png"), use_column_width=True)
         st.caption(
             "Each point represents one test sample. Colour indicates feature value "
             "(red = high, blue = low). Position on the x-axis shows the impact on the "
@@ -626,8 +631,8 @@ elif page == "📈 Model Insights":
             "The beeswarm plot shows the distribution of SHAP values for every feature "
             "across all test samples. Each point is a single account."
         )
-        if os.path.exists("outputs/shap_summary.png"):
-            st.image("outputs/shap_summary.png", use_column_width=True)
+        if os.path.exists(OUTPUTS_DIR / "shap_summary.png"):
+            st.image(str(OUTPUTS_DIR / "shap_summary.png"), use_column_width=True)
             with st.expander("How to read this plot"):
                 st.markdown(
                     """
@@ -647,8 +652,8 @@ elif page == "📈 Model Insights":
     # ── Tab 3 — Dataset explorer ─────────────────────────────────────────────
     with tab3:
         st.subheader("Dataset Explorer")
-        if os.path.exists("social_media_dataset.csv"):
-            df_data = pd.read_csv("social_media_dataset.csv")
+        if os.path.exists(BASE_DIR / "social_media_dataset.csv"):
+            df_data = pd.read_csv(BASE_DIR / "social_media_dataset.csv")
 
             c1, c2, c3 = st.columns(3)
             c1.metric("Total Records",   len(df_data))
