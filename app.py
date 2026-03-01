@@ -361,11 +361,6 @@ if page == "📊 Overview":
         _, img_col, _ = st.columns([0.5, 3, 0.5])
         with img_col:
             st.image(str(_shap_ov), use_column_width=True)
-        st.caption(
-            "Each point represents one test sample. Colour indicates feature value "
-            "(red = high, blue = low). Position on the x-axis shows the impact on the "
-            "model's bot-classification output."
-        )
         with st.expander("How to read this plot"):
             st.markdown(
                 """
