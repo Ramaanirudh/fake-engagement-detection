@@ -156,7 +156,6 @@ def _find_file(filename):
     return None
 
 
-@st.cache_data
 def load_metrics():
     path = _find_file("metrics.json")
     if path:
@@ -165,7 +164,6 @@ def load_metrics():
     return None
 
 
-@st.cache_data
 def load_feature_importance():
     path = _find_file("feature_importance.csv")
     if path:
