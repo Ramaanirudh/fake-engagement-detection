@@ -154,21 +154,29 @@ def load_models():
         st.stop()
 
 
+def _find_file(filename):
+    """Search for a file in repo root first, then outputs/ subfolder."""
+    for candidate in [BASE_DIR / filename, OUTPUTS_DIR / filename]:
+        if candidate.exists():
+            return candidate
+    return None
+
+
 @st.cache_data
 def load_metrics():
-    try:
-        with open(OUTPUTS_DIR / "metrics.json") as f:
+    path = _find_file("metrics.json")
+    if path:
+        with open(path) as f:
             return json.load(f)
-    except FileNotFoundError:
-        return None
+    return None
 
 
 @st.cache_data
 def load_feature_importance():
-    try:
-        return pd.read_csv(OUTPUTS_DIR / "feature_importance.csv")
-    except FileNotFoundError:
-        return None
+    path = _find_file("feature_importance.csv")
+    if path:
+        return pd.read_csv(path)
+    return None
 
 
 def predict_single(features: dict, rf, iso, scaler):
@@ -356,15 +364,16 @@ if page == "📊 Overview":
 
     # ── SHAP summary image ───────────────────────────────────────────────────
     st.subheader("SHAP Beeswarm Summary")
-    if os.path.exists(OUTPUTS_DIR / "shap_summary.png"):
-        st.image(str(OUTPUTS_DIR / "shap_summary.png"), use_column_width=True)
+    _shap_ov = _find_file("shap_summary.png")
+    if _shap_ov:
+        st.image(str(_shap_ov), use_column_width=True)
         st.caption(
             "Each point represents one test sample. Colour indicates feature value "
             "(red = high, blue = low). Position on the x-axis shows the impact on the "
             "model's bot-classification output."
         )
     else:
-        st.info("Run the training notebook to generate `outputs/shap_summary.png`.")
+        st.info("Upload `shap_summary.png` to your repository.")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -631,8 +640,9 @@ elif page == "📈 Model Insights":
             "The beeswarm plot shows the distribution of SHAP values for every feature "
             "across all test samples. Each point is a single account."
         )
-        if os.path.exists(OUTPUTS_DIR / "shap_summary.png"):
-            st.image(str(OUTPUTS_DIR / "shap_summary.png"), use_column_width=True)
+        _shap_path2 = _find_file("shap_summary.png")
+        if _shap_path2:
+            st.image(str(_shap_path2), use_column_width=True)
             with st.expander("How to read this plot"):
                 st.markdown(
                     """
@@ -647,13 +657,14 @@ elif page == "📈 Model Insights":
                     """
                 )
         else:
-            st.info("Run the training notebook to generate `outputs/shap_summary.png`.")
+            st.info("Upload `shap_summary.png` to your repository.")
 
     # ── Tab 3 — Dataset explorer ─────────────────────────────────────────────
     with tab3:
         st.subheader("Dataset Explorer")
-        if os.path.exists(BASE_DIR / "social_media_dataset.csv"):
-            df_data = pd.read_csv(BASE_DIR / "social_media_dataset.csv")
+        _csv_path = _find_file("social_media_dataset.csv")
+        if _csv_path:
+            df_data = pd.read_csv(_csv_path)
 
             c1, c2, c3 = st.columns(3)
             c1.metric("Total Records",   len(df_data))
