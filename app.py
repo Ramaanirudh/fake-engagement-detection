@@ -136,10 +136,10 @@ def load_models():
     """Load all serialised model artefacts from the models/ directory."""
     base = "models"
     try:
-        rf       = pickle.load(open(f"{base}/rf_model.pkl",       "rb"))
-        iso      = pickle.load(open(f"{base}/iso_forest.pkl",     "rb"))
-        scaler   = pickle.load(open(f"{base}/scaler.pkl",         "rb"))
-        explainer = pickle.load(open(f"{base}/shap_explainer.pkl","rb"))
+        rf       = pickle.load(open(f"/rf_model.pk",       "rb"))
+        iso      = pickle.load(open(f"/iso_forest.pkl",     "rb"))
+        scaler   = pickle.load(open(f"/scaler.pkl",         "rb"))
+        explainer = pickle.load(open(f"/shap_explainer.pkl","rb"))
         return rf, iso, scaler, explainer
     except FileNotFoundError as e:
         st.error(
