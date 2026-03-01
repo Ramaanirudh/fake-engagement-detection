@@ -551,8 +551,15 @@ elif page == "📈 Model Insights":
         st.subheader("SHAP Feature Importance")
         st.markdown(
             "Features are ranked by their **mean absolute SHAP value** — "
-            "a measure of each feature's average contribution to the model's predictions across the entire test set."
+            "a measure of each feature's average contribution to the model's predictions across the entire test set. "
+            "The higher the value, the more influence that feature has on whether the model classifies an account as Bot or Organic."
         )
+        if fi_df is None:
+            st.error(
+                "⚠️ `feature_importance.csv` could not be found. "
+                f"Searched in: `{BASE_DIR}` and `{OUTPUTS_DIR}`. "
+                "Please ensure the file exists in either the repo root or the `outputs/` subfolder."
+            )
         if fi_df is not None:
             # Bar chart
             fig_fi, ax_fi = plt.subplots(figsize=(7, 4))
@@ -584,80 +591,159 @@ elif page == "📈 Model Insights":
         st.markdown("---")
         st.subheader("Feature-by-Feature SHAP Interpretation")
         st.markdown(
-            "Each card below combines two perspectives: **what the beeswarm plot shows** "
-            "(dot patterns and direction) and **what the feature means** for bot detection. "
+            "Each card below provides a complete SHAP interpretation for one feature. "
+            "It explains: **(1) what pattern appears in the beeswarm plot**, **(2) what that pattern means "
+            "in plain language**, and **(3) why this matters** for detecting bot accounts. "
             "SHAP values and rankings update automatically if the model is retrained."
         )
 
-        # Shared data for combined cards
         fi_desc = {
             "behavioral_volatility_index": {
                 "beeswarm": (
-                    "🔵 Blue dots (low volatility) appear far to the **right** — strongly pushing toward Bot. "
-                    "🔴 Red dots (high volatility) appear to the **left** — pushing toward Organic."
+                    "🔵 **Blue dots** (accounts with LOW volatility) appear **far to the right** of zero — "
+                    "these are the strongest pushes toward a Bot classification. "
+                    "🔴 **Red dots** (accounts with HIGH volatility) appear **to the left** of zero — "
+                    "pushing toward Organic. The spread is the widest of all seven features, confirming this is the dominant predictor."
                 ),
                 "meaning": (
-                    "The single strongest signal. **Bots behave like scheduled scripts** — their activity is "
-                    "repetitive and uniform, resulting in very low behavioural variance. "
-                    "Human users have spontaneous, irregular behaviour that produces high volatility."
+                    "Behavioural volatility measures how much an account's activity varies over time. "
+                    "**Bots operate like scheduled scripts** — they post at fixed intervals, like the same number of "
+                    "posts per hour, every hour. This produces near-zero variance. "
+                    "Human users, by contrast, are active some days and quiet others, post more in the evenings, "
+                    "and have unpredictable bursts of activity — all of which produce high volatility."
+                ),
+                "shap_insight": (
+                    "Because this feature has the **largest mean |SHAP| value (35% of total)**, "
+                    "it is the single most influential input the Random Forest relies on. "
+                    "When volatility is low, it almost always overrides all other features and forces a Bot prediction. "
+                    "This also explains why it is placed at the top of the beeswarm plot — SHAP orders features by importance."
                 ),
             },
             "comment_similarity_score": {
                 "beeswarm": (
-                    "🔴 Red dots (high similarity) cluster to the **right** — pushing toward Bot. "
-                    "Blue dots spread left toward Organic."
+                    "🔴 **Red dots** (HIGH similarity) cluster tightly **to the right** — pushing toward Bot. "
+                    "🔵 **Blue dots** (LOW similarity) spread to the **left** toward Organic. "
+                    "The separation is clear, making this a reliable directional signal."
                 ),
                 "meaning": (
-                    "**Bots reuse templated comments** — copy-pasted promotional text or near-identical replies. "
-                    "Organic users write varied, context-specific comments that keep this score low."
+                    "Comment similarity measures how semantically alike an account's comments are across different posts. "
+                    "**Bots reuse templated, copy-pasted messages** — promotional text, spam phrases, or "
+                    "near-identical replies posted repeatedly across many posts. "
+                    "Organic users write different comments in different contexts — varied wording, tone, and content "
+                    "— keeping this score low."
+                ),
+                "shap_insight": (
+                    "Ranked 2nd at **27.7% of total SHAP importance**. "
+                    "This feature is particularly valuable because it captures the *content* of bot behaviour, "
+                    "not just the *timing*. Combined with behavioural volatility, these two features alone explain "
+                    "over 60% of the model's decision-making."
                 ),
             },
             "follower_following_ratio": {
                 "beeswarm": (
-                    "🔴 Red dots (high ratio) are spread far to the **right** — a strong bot signal with wide spread."
+                    "🔴 **Red dots** (HIGH ratio) are spread **far to the right** with a wide scatter — "
+                    "a strong and consistent bot signal. "
+                    "🔵 **Blue dots** (LOW ratio) cluster near zero with little influence. "
+                    "The outlier dots extending past 0.4 SHAP are almost entirely bots with extreme ratios."
                 ),
                 "meaning": (
-                    "Despite weak correlation with other features, this ranks 3rd — confirming it captures an "
-                    "**independent bot dimension**. Bots aggressively follow many accounts to gain followers back, "
-                    "inflating their ratio disproportionately."
+                    "This ratio compares the number of followers an account has to the number it follows. "
+                    "**Bots aggressively follow large numbers of accounts** hoping to receive follow-backs, "
+                    "which inflates their following count disproportionately relative to their actual followers. "
+                    "Organic users typically maintain a balanced ratio close to 1."
+                ),
+                "shap_insight": (
+                    "Despite showing **weak correlation (r < 0.37)** with all other features in the correlation analysis, "
+                    "this ranks 3rd at **19.8% importance**. This is a key finding: the feature captures an "
+                    "entirely **independent dimension** of bot behaviour that the other features do not overlap with. "
+                    "Removing it would meaningfully reduce model accuracy."
                 ),
             },
             "posting_frequency": {
                 "beeswarm": (
-                    "🔴 Red dots (high frequency) lean to the **right** — pushing toward Bot."
+                    "🔴 **Red dots** (HIGH frequency) lean **to the right** — pushing toward Bot. "
+                    "🔵 **Blue dots** (LOW frequency) sit **left of zero** — pushing toward Organic. "
+                    "The separation is moderate, not as clean as the top two features."
                 ),
                 "meaning": (
-                    "Automated accounts post continuously to maximise reach. "
-                    "High posting rate combined with high comment similarity is a reliable compound bot signal."
+                    "Posting frequency measures the average number of posts per day. "
+                    "**Bots post continuously and at scale** to maximise reach and engagement, "
+                    "often posting dozens of times per day. "
+                    "Organic users post occasionally — typically 1–5 times per day at most — "
+                    "resulting in a much lower and more natural posting rate."
+                ),
+                "shap_insight": (
+                    "Ranked 4th at **9.9% importance**. "
+                    "Its contribution is smaller than expected because it **partially overlaps** with behavioural volatility "
+                    "— a bot that posts frequently also tends to post at regular intervals, so the volatility feature "
+                    "already captures much of the same signal."
                 ),
             },
             "timing_regularity_score": {
                 "beeswarm": (
-                    "Points cluster tightly near zero with a slight rightward lean for higher values."
+                    "Points cluster **tightly near zero** for both classes. "
+                    "A slight rightward lean for higher values is visible, but the effect is small. "
+                    "There is no dramatic separation — most dots sit within ±0.1 SHAP."
                 ),
                 "meaning": (
-                    "Automated accounts post at predictable intervals like a scheduled task. "
-                    "However, this feature's signal is largely absorbed by the volatility index, "
-                    "making its independent contribution smaller."
+                    "Timing regularity measures how predictably spaced an account's posts are. "
+                    "A score of 1.0 means posts arrive at perfectly fixed intervals (like a cron job); "
+                    "0.0 means completely random timing. "
+                    "**Automated accounts post like scheduled tasks** — every 15 minutes, every hour — "
+                    "producing very high regularity. "
+                    "Human posting is inherently irregular."
+                ),
+                "shap_insight": (
+                    "Ranked 5th at only **6.3% importance**. "
+                    "Although the feature logically should distinguish bots from humans, "
+                    "its SHAP contribution is small because **behavioural volatility already captures the same information** "
+                    "more completely. This is a case of feature redundancy — "
+                    "both features measure predictability of behaviour, so the model learns to rely on the stronger one."
                 ),
             },
             "engagement_burst_ratio": {
                 "beeswarm": (
-                    "Most points hug zero, with a few outlier red dots to the right."
+                    "**Most points hug zero** — the majority of both bot and organic accounts have near-zero SHAP "
+                    "contribution from this feature. "
+                    "A small cluster of 🔴 **red outlier dots** extends **to the right**, "
+                    "representing a specific subset of high-burst bots."
                 ),
                 "meaning": (
-                    "Burst engagement fires for coordinated bot networks but is absent in simpler automated accounts. "
-                    "An occasional rather than universal bot signal."
+                    "Engagement burst ratio captures how much of an account's total engagement happens in "
+                    "sudden, concentrated spikes rather than gradually. "
+                    "**Coordinated bot networks** — where many bots simultaneously engage with the same post — "
+                    "produce extreme burst patterns. "
+                    "However, many simpler bots operate individually and do not produce bursts, "
+                    "which is why this signal is inconsistent."
+                ),
+                "shap_insight": (
+                    "Ranked 6th at **5.5% importance**. "
+                    "The tight clustering near zero for most samples confirms this is a **narrow, specialised signal** — "
+                    "useful for identifying coordinated bot networks specifically, "
+                    "but not a reliable general-purpose bot indicator. "
+                    "It contributes only when the burst ratio is unusually high."
                 ),
             },
             "interaction_density_score": {
                 "beeswarm": (
-                    "Very tight clustering near zero for almost all samples."
+                    "**Extremely tight clustering near zero** for almost all samples in both classes. "
+                    "The dots barely move from the centre line, indicating this feature has "
+                    "almost no influence on individual predictions."
                 ),
                 "meaning": (
-                    "The weakest predictor — its information is entirely captured by posting frequency "
-                    "and comment similarity. High inter-correlations (r > 0.6) confirmed this in the "
-                    "correlation analysis, explaining why it ranks last."
+                    "Interaction density measures the volume of interactions (likes, comments, shares) "
+                    "relative to the account's age. "
+                    "In theory, bots should have unnaturally high interaction density. "
+                    "In practice, this signal is **already fully explained** by posting frequency and comment similarity — "
+                    "an account that posts frequently and with repetitive comments will naturally also have high interaction density."
+                ),
+                "shap_insight": (
+                    "Ranked last at **3.3% importance** — the weakest contributor. "
+                    "The correlation analysis confirmed this: interaction density has correlations above r=0.6 "
+                    "with both posting frequency and comment similarity. "
+                    "In machine learning terms, this feature is **collinear** with stronger predictors, "
+                    "so the Random Forest assigns it almost no weight. "
+                    "It could be removed from the feature set without meaningfully reducing model accuracy."
                 ),
             },
         }
@@ -672,8 +758,12 @@ elif page == "📈 Model Insights":
                 rank_icon  = rank_emojis[i] if i < len(rank_emojis) else f"{i+1}."
                 info       = fi_desc.get(feat_key, {})
                 with st.expander(f"{rank_icon}  **{feat_label}** — Mean |SHAP| `{shap_val}` · `{rel_pct}` of total"):
-                    st.markdown(f"**📈 Beeswarm pattern:** {info.get('beeswarm', '')}")
-                    st.markdown(f"**🧠 What this means:** {info.get('meaning', '')}")
+                    st.markdown("**📈 Beeswarm Plot Pattern**")
+                    st.markdown(info.get("beeswarm", ""))
+                    st.markdown("**🧠 What This Feature Measures**")
+                    st.markdown(info.get("meaning", ""))
+                    st.markdown("**📊 SHAP Significance**")
+                    st.markdown(info.get("shap_insight", ""))
 
     # ── Tab 2 — Dataset Explorer ──────────────────────────────────────────────
     with tab_data:
@@ -697,55 +787,103 @@ elif page == "📈 Model Insights":
                 FEATURE_COLS,
                 format_func=lambda x: FEATURE_LABELS[x],
             )
-            fig, ax = plt.subplots(figsize=(8, 3.5))
+            fig, ax = plt.subplots(figsize=(8, 4))
             fig.patch.set_facecolor("#1E2130")
             ax.set_facecolor("#1E2130")
-            for label_val, color, name in [(0, "#21C55D", "Organic"), (1, "#FF4B4B", "Bot")]:
-                subset = df_data[df_data["label"] == label_val][feat_sel]
-                ax.hist(subset, bins=40, alpha=0.65, color=color, label=name, edgecolor="none")
+            bins = np.linspace(
+                df_data[feat_sel].min(), df_data[feat_sel].max(), 41
+            )
+            # Filled bars for Organic (drawn first, behind)
+            ax.hist(df_data[df_data["label"]==0][feat_sel], bins=bins,
+                    alpha=0.55, color="#21C55D", label="Organic", edgecolor="none")
+            # Outline-only bars for Bot (drawn on top so overlap is visible as outline)
+            ax.hist(df_data[df_data["label"]==1][feat_sel], bins=bins,
+                    alpha=0.75, color="#FF4B4B", label="Bot",
+                    edgecolor="#FF4B4B", linewidth=0.8, histtype="stepfilled")
             ax.set_xlabel(FEATURE_LABELS[feat_sel], color="#8B9DC3", fontsize=9)
             ax.set_ylabel("Count", color="#8B9DC3", fontsize=9)
             ax.set_title(f"Distribution of {FEATURE_LABELS[feat_sel]}", color="#A8C0E8",
                          fontsize=11, fontweight="bold")
             ax.tick_params(colors="#8B9DC3")
-            ax.legend(facecolor="#252A3D", edgecolor="#2E3250", labelcolor="#E0E0E0")
+            legend = ax.legend(facecolor="#252A3D", edgecolor="#2E3250", labelcolor="#E0E0E0")
             for spine in ax.spines.values():
                 spine.set_edgecolor("#2E3250")
             plt.tight_layout()
             st.pyplot(fig)
             plt.close(fig)
+            st.caption(
+                "🟢 **Green** = Organic accounts · 🔴 **Red** = Bot accounts · "
+                "**Where green and red overlap**, the colours blend — this overlap zone indicates "
+                "that both classes share similar values for this feature in that range, "
+                "meaning the feature alone cannot distinguish them in that region."
+            )
 
             dist_insights = {
-                "timing_regularity_score":
-                    "**What the distribution reveals:** Bot accounts (red) are shifted toward higher values "
-                    "with a tighter spread, confirming they post at more predictable intervals. "
-                    "Organic users (green) show a broader, lower-centred distribution reflecting natural variation.",
-                "engagement_burst_ratio":
-                    "**What the distribution reveals:** Both classes overlap heavily at lower values, "
-                    "but bots have a longer right tail — occasional extreme burst events that organic users rarely produce.",
-                "comment_similarity_score":
-                    "**What the distribution reveals:** The two distributions are clearly separated. "
-                    "Bots cluster at higher similarity scores (templated comments), while organic users "
-                    "spread across lower values (varied, unique comments).",
-                "interaction_density_score":
-                    "**What the distribution reveals:** The distributions largely overlap, consistent "
-                    "with this being the weakest SHAP contributor — it does not cleanly separate the classes.",
-                "follower_following_ratio":
-                    "**What the distribution reveals:** Organic users (green) concentrate near a ratio of 1. "
-                    "Bots (red) extend further right with higher ratios, reflecting their aggressive following strategy.",
-                "posting_frequency":
-                    "**What the distribution reveals:** Organic users post infrequently (left-clustered). "
-                    "Bots show a wider spread at higher frequencies, consistent with automated high-volume posting.",
-                "behavioral_volatility_index":
-                    "**What the distribution reveals:** This is the cleanest separation of all seven features. "
-                    "Bots cluster at very low volatility values (scripted, predictable). "
-                    "Organic users spread across higher values (irregular, human behaviour). "
-                    "This directly explains why it is the #1 SHAP feature.",
+                "timing_regularity_score": (
+                    "**What the distribution reveals:** "
+                    "Bot accounts (red) are shifted toward **higher regularity values** with a tighter, narrower spread — "
+                    "confirming they post at predictable, clock-like intervals. "
+                    "Organic users (green) show a broader distribution at lower values, reflecting natural irregular activity. "
+                    "The **overlap zone** in the mid-range indicates some organic users also post fairly regularly "
+                    "(e.g. scheduled content creators), which reduces this feature's reliability on its own. "
+                    "This is why it ranks 5th in SHAP importance despite being logically intuitive."
+                ),
+                "engagement_burst_ratio": (
+                    "**What the distribution reveals:** "
+                    "Both classes **overlap heavily at lower values (0.0–0.6)** — both bots and organic users can have "
+                    "low burst ratios, which is why this feature ranks 6th in SHAP importance. "
+                    "The key signal is the **right tail (0.6–1.0)**: bots extend significantly further right "
+                    "with extreme burst values that organic users rarely produce. "
+                    "The large overlap zone confirms this feature is a narrow, specialised signal "
+                    "— it only fires reliably for coordinated bot networks, not all bot types."
+                ),
+                "comment_similarity_score": (
+                    "**What the distribution reveals:** "
+                    "This is one of the **cleanest separations** in the dataset. "
+                    "Bots cluster at **higher similarity scores** (copy-pasted, templated comments), "
+                    "while organic users concentrate at **lower scores** (varied, context-specific writing). "
+                    "The overlap zone is relatively narrow, appearing around mid-range values — "
+                    "some organic users do repeat phrases occasionally, and some bots vary their messages slightly. "
+                    "The clear separation confirms why this ranks 2nd in SHAP importance."
+                ),
+                "interaction_density_score": (
+                    "**What the distribution reveals:** "
+                    "The two distributions **heavily overlap throughout the entire range** — "
+                    "there is almost no region where one class clearly dominates. "
+                    "This directly explains why this feature ranks last in SHAP importance (3.3%): "
+                    "the model cannot use it to reliably separate bots from organic accounts. "
+                    "Its information is entirely captured by posting frequency and comment similarity, "
+                    "which are much stronger predictors of the same underlying behaviour."
+                ),
+                "follower_following_ratio": (
+                    "**What the distribution reveals:** "
+                    "Organic users (green) concentrate near a **ratio of 1** (roughly equal followers and following). "
+                    "Bots (red) extend further right with **higher ratios**, reflecting their aggressive "
+                    "mass-following strategy. "
+                    "The overlap zone near ratio 1–3 includes both classes, meaning a moderately high ratio alone "
+                    "is not definitive. However, extreme ratios (above 5) are almost exclusively bots — "
+                    "this is the region that contributes the most SHAP value for this feature."
+                ),
+                "posting_frequency": (
+                    "**What the distribution reveals:** "
+                    "Organic users (green) cluster at **low posting frequencies** (left side), "
+                    "reflecting natural, occasional posting behaviour. "
+                    "Bots (red) spread across **higher frequencies**, consistent with automated, high-volume posting. "
+                    "The overlap at low-to-mid frequencies means casual bots that post infrequently "
+                    "are harder to detect using this feature alone — "
+                    "which is why it ranks 4th rather than higher despite being intuitively important."
+                ),
+                "behavioral_volatility_index": (
+                    "**What the distribution reveals:** "
+                    "This is the **clearest class separation of all seven features**. "
+                    "Bots (red) cluster almost entirely at **very low volatility values** (scripted, predictable, repetitive). "
+                    "Organic users (green) spread across **higher volatility values** (irregular, spontaneous, human). "
+                    "The overlap zone is minimal — only the edges of each distribution touch. "
+                    "This cleanest-possible separation is exactly why this feature holds the #1 SHAP rank (35% of total importance): "
+                    "a low volatility score is the single strongest individual signal of automated bot behaviour."
+                ),
             }
             st.info(dist_insights.get(feat_sel, ""))
-
-            with st.expander("Preview raw data"):
-                st.dataframe(df_data.head(50), use_container_width=True)
         else:
             st.info(
                 "Dataset not found. Run `generate_dataset.py` to create "
