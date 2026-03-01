@@ -288,10 +288,6 @@ with st.sidebar:
         - Random Forest (classifier)
         - SHAP (explainability)
 
-        **Dataset**
-        - 1,000 synthetic accounts
-        - 7 behavioural features
-        - 30% bot prevalence
         """
     )
     st.markdown("---")
@@ -330,7 +326,6 @@ if page == "📊 Overview":
 
     # ── Confusion matrix ─────────────────────────────────────────────────────
     with col_left:
-        st.subheader("Confusion Matrix")
         if metrics:
             st.pyplot(confusion_matrix_fig(metrics["confusion_matrix"]))
             st.caption(
@@ -340,7 +335,6 @@ if page == "📊 Overview":
 
     # ── Feature importance ───────────────────────────────────────────────────
     with col_right:
-        st.subheader("Feature Importance (SHAP)")
         if fi_df is not None:
             fig, ax = plt.subplots(figsize=(6, 4))
             fig.patch.set_facecolor("#1E2130")
