@@ -366,6 +366,19 @@ if page == "📊 Overview":
             "(red = high, blue = low). Position on the x-axis shows the impact on the "
             "model's bot-classification output."
         )
+        with st.expander("How to read this plot"):
+            st.markdown(
+                """
+| Element | Meaning |
+|---|---|
+| **X-axis position** | Impact on the bot-classification output (positive = pushes toward Bot) |
+| **Point colour (red)** | High feature value for that sample |
+| **Point colour (blue)** | Low feature value for that sample |
+| **Vertical spread** | Multiple samples with similar SHAP values |
+
+**Example interpretation:** For , blue points (low volatility) appear on the right (positive SHAP = pushes toward Bot). This confirms that accounts with low behavioural variability are more likely to be classified as bots.
+                """
+            )
     else:
         st.info("Upload `shap_summary.png` to your repository.")
 
